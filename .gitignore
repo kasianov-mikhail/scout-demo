@@ -4,6 +4,9 @@ DerivedData/
 *.xcuserstate
 *.xcworkspace/xcuserdata/
 xcuserdata/
+
+# Resolved against the local sibling checkouts, not the shipped dependency graph
+ScoutDemo.xcworkspace/xcshareddata/
 *.moved-aside
 *.hmap
 *.ipa
