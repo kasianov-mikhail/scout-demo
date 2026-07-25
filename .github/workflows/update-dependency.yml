@@ -1,0 +1,65 @@
+name: Update Scout
+
+on:
+  repository_dispatch:
+    types: [scout-updated]
+
+concurrency:
+  group: update-scout
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: macos-26
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Update Scout dependency
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          git config user.name "Mikhail Kasianov"
+          git config user.email "96941969+kasianov-mikhail@users.noreply.github.com"
+          rm ScoutDemo.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+          xcodebuild -resolvePackageDependencies -project ScoutDemo.xcodeproj
+          if git diff --quiet; then
+            echo "No dependency changes"
+          else
+            FULL_SHA=$(jq -r '.pins[] | select(.identity == "scout") | .state.revision' ScoutDemo.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved)
+            SHA=$(echo "$FULL_SHA" | cut -c1-7)
+            TITLE="Update Scout dependency to $SHA"
+            # Reference the Scout PR that introduced this revision in the body, falling back to the commit
+            PR_INFO=$(gh api "repos/kasianov-mikhail/scout/commits/$FULL_SHA/pulls" 2>/dev/null || echo '[]')
+            PR_NUMBER=$(echo "$PR_INFO" | jq -r '.[0].number // empty')
+            PR_TITLE=$(echo "$PR_INFO" | jq -r '.[0].title // empty')
+            if [ -n "$PR_NUMBER" ]; then
+              BODY="$PR_TITLE (kasianov-mikhail/scout#$PR_NUMBER)"
+            else
+              BODY="kasianov-mikhail/scout@$FULL_SHA"
+            fi
+            BRANCH="auto/update-scout-$(date +%s)"
+            git checkout -b "$BRANCH"
+            git add ScoutDemo.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+            git commit -m "$TITLE" -m "$BODY"
+            git push -u origin "$BRANCH"
+            gh pr create --title "$TITLE" --body "$BODY" --head "$BRANCH" --base main
+            # Mergeability is computed asynchronously, so poll until GitHub reports it.
+            # Tolerate transient API failures so a timeout here doesn't abort the job after the PR is already open.
+            for _ in {1..10}; do
+              MERGEABLE=$(gh pr view "$BRANCH" --json mergeable --jq '.mergeable' 2>/dev/null || echo UNKNOWN)
+              [ "$MERGEABLE" != "UNKNOWN" ] && break
+              sleep 3
+            done
+            if [ "$MERGEABLE" = "CONFLICTING" ]; then
+              gh pr close "$BRANCH" --comment "Closed due to merge conflicts" --delete-branch
+            else
+              gh pr merge "$BRANCH" --auto --squash --delete-branch --body "$BODY"
+            fi
+            gh pr list --state open --json number,headRefName \
+              --jq '.[] | select(.headRefName | startswith("auto/update-scout-")) | select(.headRefName != "'"$BRANCH"'") | .number' \
+              | xargs -I{} gh pr close {} --comment "Superseded by Scout update to $SHA" --delete-branch
+          fi

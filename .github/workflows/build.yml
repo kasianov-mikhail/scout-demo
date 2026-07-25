@@ -1,0 +1,55 @@
+name: Build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: macos-26
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Lint
+        run: xcrun swift-format lint --recursive ScoutDemo
+
+  build:
+    name: ${{ matrix.device }} (iOS ${{ matrix.ios }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The app targets iOS 26, so there is no older leg to build against.
+          - os: macos-26
+            device: iPhone 17
+            ios: 26
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Prepare simulator
+        run: |
+          if ! xcrun simctl list devices available | grep -q "iPhone"; then
+            xcodebuild -downloadPlatform iOS
+          fi
+
+      - name: Build
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project ScoutDemo.xcodeproj \
+            -scheme ScoutDemo \
+            -destination 'platform=iOS Simulator,name=${{ matrix.device }}' \
+            -skipMacroValidation \
+            -skipPackagePluginValidation \
+            | xcbeautify
