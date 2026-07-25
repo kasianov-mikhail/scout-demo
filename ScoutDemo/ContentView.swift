@@ -1,5 +1,7 @@
+import DemoConnector
+import Scout
+import ScoutUI
 import SwiftUI
-import Playgrounds
 
 @main struct MyApp: App {
     var body: some Scene {
@@ -10,16 +12,16 @@ import Playgrounds
 }
 
 struct ContentView: View {
+    @State private var isPresented = false
+
     var body: some View {
-        Text("Hello, world!")
-            .padding()
+        Button("Open Scout") {
+            isPresented = true
+        }
+        .scoutHome(isPresented: $isPresented, backends: [.demo()])
     }
 }
 
 #Preview {
     ContentView()
-}
-
-#Playground {
-    _ = 1 + 2
 }
