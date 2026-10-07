@@ -7,3 +7,5 @@ Document only public API: write doc comments (`///`) for `public`/`open` declara
 Don't use `// MARK:` comments to divide code into sections.
 
 When your edits make git treat a source file as new — a file you just created, or a move/rewrite git records as an add rather than a rename — set that file's MIT header year (`// Copyright <year> Mikhail Kasianov`) to the current year. Leave the year untouched on files git still sees as edits to an existing file.
+
+In an initializer, if at least one property assignment needs `self.` (a parameter or local shadows the property), prefix every property assignment with `self.` for consistency; if none needs it, omit `self.` from all of them.
