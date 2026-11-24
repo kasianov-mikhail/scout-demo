@@ -25,7 +25,7 @@ struct ContentView: View {
         Button("Open Scout") {
             isPresented = true
         }
-        .scoutHome(isPresented: $isPresented, backends: [.demo()], mark: "DEMO")
+        .scoutHome(isPresented: $isPresented, backends: [.demo()])
     }
 }
 
